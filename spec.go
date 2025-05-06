@@ -9,12 +9,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Spec defines the simple DSL for setting injection counts.
 type Spec struct {
-	Failures map[string]int `yaml:"failures"`
+	Failures        map[string]int `yaml:"failures"`         // first-N
+	PreciseFailures map[string]int `yaml:"precise-failures"` // Nth
 }
 
-// LoadSpec loads a YAML file and applies its failure counts.
 func LoadSpec(path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -27,6 +26,9 @@ func LoadSpec(path string) error {
 	Reset()
 	for k, v := range cfg.Failures {
 		SetFailures(k, v)
+	}
+	for k, v := range cfg.PreciseFailures {
+		SetNthFailure(k, v)
 	}
 	return nil
 }

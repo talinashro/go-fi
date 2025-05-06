@@ -1,0 +1,6 @@
+# Use the extended DSL with preciseFailures
+failures:           # still supported (first-N failures)
+  create-storage: 1
+
+precise-failures:    # new “Nth only” injection
+  create-primary-ec2: 3

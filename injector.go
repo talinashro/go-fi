@@ -16,9 +16,9 @@ var (
 	limits   = make(map[string]int) // old "fail first N" behavior
 	precise  = make(map[string]int) // new "fail only on Nth call" behavior
 	counters = make(map[string]int)
-	
+
 	// Environment control
-	allowedEnvironments = []string{"development", "staging", "testing"}
+	allowedEnvironments    = []string{"development", "staging", "testing"}
 	productionEnvironments = []string{"production", "prod"}
 )
 
@@ -45,21 +45,21 @@ func isProductionEnvironment() bool {
 	if env == "" {
 		env = strings.ToLower(os.Getenv("GO_ENV"))
 	}
-	
+
 	// Check if it's explicitly marked as production
 	for _, prodEnv := range productionEnvironments {
 		if env == prodEnv {
 			return true
 		}
 	}
-	
+
 	// Check if it's in allowed environments
 	for _, allowedEnv := range allowedEnvironments {
 		if env == allowedEnv {
 			return false
 		}
 	}
-	
+
 	// Default to production if environment is not explicitly allowed
 	return true
 }
@@ -73,7 +73,7 @@ func Inject(key string) bool {
 	if isProductionEnvironment() {
 		return false
 	}
-	
+
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -155,7 +155,7 @@ func SetFailures(key string, count int) {
 	if isProductionEnvironment() {
 		return
 	}
-	
+
 	mu.Lock()
 	defer mu.Unlock()
 	limits[key] = count
@@ -171,7 +171,7 @@ func SetNthFailure(key string, nth int) {
 	if isProductionEnvironment() {
 		return
 	}
-	
+
 	mu.Lock()
 	defer mu.Unlock()
 	precise[key] = nth

@@ -111,7 +111,7 @@ func sendEmail(ctx context.Context, email string) error {
 func startHTTPServer() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/users", userHandler)
-	
+
 	go func() {
 		log.Println("   HTTP server starting on :8080")
 		if err := http.ListenAndServe(":8080", mux); err != nil {
@@ -126,4 +126,4 @@ func userHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write([]byte(`{"message": "user handler success"}`))
-} 
+}

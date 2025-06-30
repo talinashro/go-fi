@@ -103,7 +103,7 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 func dataHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"data": []string{"item1", "item2", "item3"},
+		"data":  []string{"item1", "item2", "item3"},
 		"count": 3,
 	})
 }
@@ -116,4 +116,4 @@ func slowHandler(w http.ResponseWriter, r *http.Request) {
 func criticalHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"message": "critical operation completed"})
-} 
+}

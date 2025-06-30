@@ -70,4 +70,4 @@ func callAPI() error {
 		return fmt.Errorf("API call failed")
 	}
 	return nil
-} 
+}

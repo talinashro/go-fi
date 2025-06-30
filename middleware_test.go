@@ -10,8 +10,9 @@ import (
 )
 
 type ctxKey string
+
 const (
-	testKey ctxKey = "test-key"
+	testKey     ctxKey = "test-key"
 	originalKey ctxKey = "original-key"
 )
 
@@ -223,10 +224,10 @@ func TestWithFaultInjection(t *testing.T) {
 		setup      func()
 	}{
 		{
-			name:       "no fault configured",
-			faultKey:   "nonexistent",
-			input:      "test input",
-			expected:   nil,
+			name:     "no fault configured",
+			faultKey: "nonexistent",
+			input:    "test input",
+			expected: nil,
 		},
 		{
 			name:       "fault configured - injects failure",
@@ -292,11 +293,11 @@ func TestWithFaultInjectionContext(t *testing.T) {
 		setup      func()
 	}{
 		{
-			name:       "no fault configured",
-			faultKey:   "nonexistent",
-			input:      "test input",
-			ctx:        context.Background(),
-			expected:   nil,
+			name:     "no fault configured",
+			faultKey: "nonexistent",
+			input:    "test input",
+			ctx:      context.Background(),
+			expected: nil,
 		},
 		{
 			name:       "fault configured - injects failure",
@@ -440,7 +441,7 @@ func TestMiddlewareRequestContext(t *testing.T) {
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Add a value to context (not used in this test, but demonstrates context access)
 			_ = context.WithValue(r.Context(), testKey, "test-value")
-			
+
 			w.WriteHeader(200)
 			w.Write([]byte("success"))
 		})
@@ -464,5 +465,3 @@ func TestMiddlewareRequestContext(t *testing.T) {
 		}
 	})
 }
-
- 

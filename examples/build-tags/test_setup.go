@@ -6,8 +6,8 @@
 package main
 
 import (
-	"log"
 	"github.com/talinashro/go-fi/faultinject"
+	"log"
 )
 
 func init() {
@@ -17,9 +17,9 @@ func init() {
 		log.Printf("Failed to load fault spec: %v", err)
 		return
 	}
-	
+
 	// Configure some test failures
 	faultinject.SetFailures("user-create", 2)
-	
+
 	log.Printf("Fault injection configured: %v", faultinject.Status())
-} 
+}

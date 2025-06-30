@@ -100,4 +100,4 @@ type User struct {
 func createUser(user User) error {
 	log.Printf("Creating user: %s", user.Name)
 	return nil
-} 
+}

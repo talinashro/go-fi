@@ -140,7 +140,7 @@ precise-failures:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resetState()
-			
+
 			var filename string
 			if tt.setup != nil {
 				filename = tt.setup()
@@ -184,14 +184,14 @@ func TestLoadSpecContent(t *testing.T) {
 			name:        "valid precise failures content",
 			content:     "precise-failures:\n  precise-api: 10\n  precise-db: 7",
 			expectError: false,
-			expected: map[string]int{}, // Status() does not expose precise failures
+			expected:    map[string]int{}, // Status() does not expose precise failures
 		},
 		{
 			name:        "both failure types",
 			content:     "failures:\n  api-fault: 5\nprecise-failures:\n  precise-api: 10",
 			expectError: false,
 			expected: map[string]int{
-				"api-fault":  5,
+				"api-fault": 5,
 			},
 		},
 		{
@@ -227,7 +227,7 @@ func TestLoadSpecContent(t *testing.T) {
 				t.Fatalf("Failed to create temp file: %v", err)
 			}
 			defer os.Remove(filename)
-			
+
 			err = LoadSpec(filename)
 
 			if tt.expectError && err == nil {
@@ -425,4 +425,4 @@ failures:
 			t.Errorf("Expected negative-fault: 0 and positive-fault: 5, got %+v", status)
 		}
 	})
-} 
+}

@@ -51,4 +51,4 @@ func WithFaultInjectionContext[T any](key string, fn func(T) error) func(context
 		}
 		return fn(input)
 	}
-} 
+}

@@ -17,16 +17,16 @@ func main() {
 	// Simulate some operations
 	for i := 1; i <= 5; i++ {
 		log.Printf("Operation %d:", i)
-		
+
 		if err := createUser(fmt.Sprintf("user%d@example.com", i)); err != nil {
 			log.Printf("  Failed: %v", err)
 		} else {
 			log.Printf("  Succeeded")
 		}
-		
+
 		time.Sleep(500 * time.Millisecond)
 	}
-	
+
 	log.Println("Application completed.")
 }
 
@@ -35,8 +35,8 @@ func createUser(email string) error {
 	if faultinject.Inject("user-create") {
 		return fmt.Errorf("injected user creation failure")
 	}
-	
+
 	// Simulate actual user creation logic
 	log.Printf("  Creating user: %s", email)
 	return nil
-} 
+}

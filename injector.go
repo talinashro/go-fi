@@ -130,6 +130,9 @@ func InjectWithErrorf(key string, format string, args ...interface{}) error {
 func InjectWithContext(ctx context.Context, key string) bool {
 	// Check if context has fault injection override
 	if ctx != nil {
+		if ctx.Err() != nil {
+			return false // Do not inject if context is cancelled
+		}
 		if override, ok := ctx.Value("faultinject:" + key).(bool); ok {
 			return override
 		}

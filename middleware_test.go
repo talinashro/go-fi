@@ -2,6 +2,7 @@ package faultinject
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -33,7 +34,7 @@ func TestHTTPMiddleware(t *testing.T) {
 			expectedStatus: 500,
 			expectedBody:   "Injected failure",
 			setup: func() {
-				failures["api-fault"] = 1
+				SetFailures("api-fault", 1)
 			},
 		},
 		{
@@ -43,7 +44,7 @@ func TestHTTPMiddleware(t *testing.T) {
 			expectedStatus: 200,
 			expectedBody:   "success",
 			setup: func() {
-				failures["zero-fault"] = 0
+				SetFailures("zero-fault", 0)
 			},
 		},
 	}
@@ -122,7 +123,7 @@ func TestHTTPMiddlewareWithResponse(t *testing.T) {
 				w.Write([]byte(`{"error":"service unavailable"}`))
 			},
 			setup: func() {
-				failures["api-fault"] = 1
+				SetFailures("api-fault", 1)
 			},
 		},
 		{
@@ -138,7 +139,7 @@ func TestHTTPMiddlewareWithResponse(t *testing.T) {
 				w.Write([]byte("retry later"))
 			},
 			setup: func() {
-				failures["retry-fault"] = 1
+				SetFailures("retry-fault", 1)
 			},
 		},
 		{
@@ -152,7 +153,7 @@ func TestHTTPMiddlewareWithResponse(t *testing.T) {
 				w.Write([]byte("request timeout"))
 			},
 			setup: func() {
-				failures["timeout-fault"] = 1
+				SetFailures("timeout-fault", 1)
 			},
 		},
 	}
@@ -226,9 +227,9 @@ func TestWithFaultInjection(t *testing.T) {
 			faultKey:   "func-fault",
 			faultCount: 1,
 			input:      "test input",
-			expected:   errInjectedFailure,
+			expected:   fmt.Errorf("injected failure"),
 			setup: func() {
-				failures["func-fault"] = 1
+				SetFailures("func-fault", 1)
 			},
 		},
 		{
@@ -238,7 +239,7 @@ func TestWithFaultInjection(t *testing.T) {
 			input:      "test input",
 			expected:   nil,
 			setup: func() {
-				failures["zero-fault"] = 0
+				SetFailures("zero-fault", 0)
 			},
 		},
 	}
@@ -262,7 +263,9 @@ func TestWithFaultInjection(t *testing.T) {
 			err := decoratedFn(tt.input)
 
 			// Check result
-			if err != tt.expected {
+			if (err == nil && tt.expected != nil) || (err != nil && tt.expected == nil) {
+				t.Errorf("Expected error %v, got %v", tt.expected, err)
+			} else if err != nil && tt.expected != nil && err.Error() != tt.expected.Error() {
 				t.Errorf("Expected error %v, got %v", tt.expected, err)
 			}
 		})
@@ -295,9 +298,9 @@ func TestWithFaultInjectionContext(t *testing.T) {
 			faultCount: 1,
 			input:      "test input",
 			ctx:        context.Background(),
-			expected:   errInjectedFailure,
+			expected:   fmt.Errorf("injected failure"),
 			setup: func() {
-				failures["ctx-fault"] = 1
+				SetFailures("ctx-fault", 1)
 			},
 		},
 		{
@@ -308,7 +311,7 @@ func TestWithFaultInjectionContext(t *testing.T) {
 			ctx:        func() context.Context { ctx, cancel := context.WithCancel(context.Background()); cancel(); return ctx }(),
 			expected:   nil,
 			setup: func() {
-				failures["ctx-fault"] = 1
+				SetFailures("ctx-fault", 1)
 			},
 		},
 	}
@@ -332,7 +335,9 @@ func TestWithFaultInjectionContext(t *testing.T) {
 			err := decoratedFn(tt.ctx, tt.input)
 
 			// Check result
-			if err != tt.expected {
+			if (err == nil && tt.expected != nil) || (err != nil && tt.expected == nil) {
+				t.Errorf("Expected error %v, got %v", tt.expected, err)
+			} else if err != nil && tt.expected != nil && err.Error() != tt.expected.Error() {
 				t.Errorf("Expected error %v, got %v", tt.expected, err)
 			}
 		})
@@ -345,8 +350,8 @@ func TestMiddlewareChaining(t *testing.T) {
 
 	t.Run("multiple middleware layers", func(t *testing.T) {
 		resetState()
-		failures["outer-fault"] = 1
-		failures["inner-fault"] = 1
+		SetFailures("outer-fault", 1)
+		SetFailures("inner-fault", 1)
 
 		// Create test handler
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -380,7 +385,7 @@ func TestMiddlewareChaining(t *testing.T) {
 
 	t.Run("mixed middleware types", func(t *testing.T) {
 		resetState()
-		failures["default-fault"] = 1
+		SetFailures("default-fault", 1)
 
 		// Create test handler
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -423,7 +428,7 @@ func TestMiddlewareRequestContext(t *testing.T) {
 
 	t.Run("request context is passed through", func(t *testing.T) {
 		resetState()
-		failures["context-fault"] = 1
+		SetFailures("context-fault", 1)
 
 		// Create test handler that checks context
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -455,10 +460,4 @@ func TestMiddlewareRequestContext(t *testing.T) {
 	})
 }
 
-// Helper function to reset internal state for testing
-func resetState() {
-	failures = make(map[string]int)
-	preciseFailures = make(map[string]int)
-	allowedEnvironments = defaultAllowedEnvironments
-	productionEnvironments = defaultProductionEnvironments
-} 
+ 

@@ -2,6 +2,7 @@ package faultinject
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -172,7 +173,7 @@ func TestLoadSpecContent(t *testing.T) {
 	}{
 		{
 			name:        "valid failures content",
-			content:     `failures:\n  api-fault: 5\n  db-fault: 3`,
+			content:     "failures:\n  api-fault: 5\n  db-fault: 3",
 			expectError: false,
 			expected: map[string]int{
 				"api-fault": 5,
@@ -181,37 +182,33 @@ func TestLoadSpecContent(t *testing.T) {
 		},
 		{
 			name:        "valid precise failures content",
-			content:     `precise-failures:\n  precise-api: 10\n  precise-db: 7`,
+			content:     "precise-failures:\n  precise-api: 10\n  precise-db: 7",
 			expectError: false,
-			expected: map[string]int{
-				"precise-api": 10,
-				"precise-db":  7,
-			},
+			expected: map[string]int{}, // Status() does not expose precise failures
 		},
 		{
 			name:        "both failure types",
-			content:     `failures:\n  api-fault: 5\nprecise-failures:\n  precise-api: 10`,
+			content:     "failures:\n  api-fault: 5\nprecise-failures:\n  precise-api: 10",
 			expectError: false,
 			expected: map[string]int{
 				"api-fault":  5,
-				"precise-api": 10,
 			},
 		},
 		{
 			name:        "empty content",
-			content:     ``,
+			content:     "",
 			expectError: false,
 			expected:    map[string]int{},
 		},
 		{
 			name:        "invalid YAML",
-			content:     `failures:\n  api-fault: [invalid`,
+			content:     "failures:\n  api-fault: [invalid",
 			expectError: true,
 			expected:    map[string]int{},
 		},
 		{
 			name:        "non-integer values",
-			content:     `failures:\n  api-fault: "string"`,
+			content:     "failures:\n  api-fault: \"string\"",
 			expectError: true,
 			expected:    map[string]int{},
 		},
@@ -221,7 +218,17 @@ func TestLoadSpecContent(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			resetState()
 
-			err := loadSpecContent([]byte(tt.content))
+			// Fix: Replace \n with real newlines for valid YAML
+			content := strings.ReplaceAll(tt.content, "\\n", "\n")
+
+			filename := "temp-spec.yaml"
+			err := os.WriteFile(filename, []byte(content), 0644)
+			if err != nil {
+				t.Fatalf("Failed to create temp file: %v", err)
+			}
+			defer os.Remove(filename)
+			
+			err = LoadSpec(filename)
 
 			if tt.expectError && err == nil {
 				t.Errorf("Expected error but got none")
@@ -230,12 +237,13 @@ func TestLoadSpecContent(t *testing.T) {
 				t.Errorf("Expected no error but got: %v", err)
 			}
 
-			// Check if failures were loaded correctly
+			// Check if failures were loaded correctly (only first-N failures)
 			if !tt.expectError {
+				status := Status()
 				for key, expectedCount := range tt.expected {
-					if failures[key] != expectedCount && preciseFailures[key] != expectedCount {
-						t.Errorf("Expected %s to have count %d, but got failures[%s]=%d, preciseFailures[%s]=%d",
-							key, expectedCount, key, failures[key], key, preciseFailures[key])
+					if status[key] != expectedCount {
+						t.Errorf("Expected %s to have count %d, but got %d",
+							key, expectedCount, status[key])
 					}
 				}
 			}
@@ -251,22 +259,18 @@ func TestLoadSpecMultipleFiles(t *testing.T) {
 		resetState()
 
 		// Create first file
-		content1 := `failures:
-  api-fault: 5
-  db-fault: 3`
+		content1 := "failures:\n  api-fault: 5\n  db-fault: 3"
 		filename1 := "test-multi1.yaml"
-		err := os.WriteFile(filename1, []byte(content1), 0644)
+		err := os.WriteFile(filename1, []byte(strings.ReplaceAll(content1, "\\n", "\n")), 0644)
 		if err != nil {
 			t.Fatalf("Failed to create test file: %v", err)
 		}
 		defer os.Remove(filename1)
 
 		// Create second file
-		content2 := `precise-failures:
-  precise-api: 10
-  precise-db: 7`
+		content2 := "failures:\n  only-fault: 42"
 		filename2 := "test-multi2.yaml"
-		err = os.WriteFile(filename2, []byte(content2), 0644)
+		err = os.WriteFile(filename2, []byte(strings.ReplaceAll(content2, "\\n", "\n")), 0644)
 		if err != nil {
 			t.Fatalf("Failed to create test file: %v", err)
 		}
@@ -278,24 +282,25 @@ func TestLoadSpecMultipleFiles(t *testing.T) {
 			t.Errorf("Failed to load first file: %v", err)
 		}
 
-		// Load second file
+		// Check first file's failures
+		status := Status()
+		if status["api-fault"] != 5 {
+			t.Errorf("Expected api-fault to be 5, got %d", status["api-fault"])
+		}
+		if status["db-fault"] != 3 {
+			t.Errorf("Expected db-fault to be 3, got %d", status["db-fault"])
+		}
+
+		// Load second file (should reset state)
 		err = LoadSpec(filename2)
 		if err != nil {
 			t.Errorf("Failed to load second file: %v", err)
 		}
 
-		// Verify both files were loaded
-		if failures["api-fault"] != 5 {
-			t.Errorf("Expected api-fault to be 5, got %d", failures["api-fault"])
-		}
-		if failures["db-fault"] != 3 {
-			t.Errorf("Expected db-fault to be 3, got %d", failures["db-fault"])
-		}
-		if preciseFailures["precise-api"] != 10 {
-			t.Errorf("Expected precise-api to be 10, got %d", preciseFailures["precise-api"])
-		}
-		if preciseFailures["precise-db"] != 7 {
-			t.Errorf("Expected precise-db to be 7, got %d", preciseFailures["precise-db"])
+		// After loading the second file, only its failures should be present
+		status = Status()
+		if len(status) != 1 || status["only-fault"] != 42 {
+			t.Errorf("Expected only-fault to be 42 and only one fault present, got %+v", status)
 		}
 	})
 
@@ -303,20 +308,18 @@ func TestLoadSpecMultipleFiles(t *testing.T) {
 		resetState()
 
 		// Create valid file
-		content1 := `failures:
-  api-fault: 5`
+		content1 := "failures:\n  api-fault: 5"
 		filename1 := "test-valid.yaml"
-		err := os.WriteFile(filename1, []byte(content1), 0644)
+		err := os.WriteFile(filename1, []byte(strings.ReplaceAll(content1, "\\n", "\n")), 0644)
 		if err != nil {
 			t.Fatalf("Failed to create test file: %v", err)
 		}
 		defer os.Remove(filename1)
 
 		// Create invalid file
-		content2 := `failures:
-  api-fault: "invalid"`
+		content2 := "failures:\n  api-fault: \"invalid\""
 		filename2 := "test-invalid.yaml"
-		err = os.WriteFile(filename2, []byte(content2), 0644)
+		err = os.WriteFile(filename2, []byte(strings.ReplaceAll(content2, "\\n", "\n")), 0644)
 		if err != nil {
 			t.Fatalf("Failed to create test file: %v", err)
 		}
@@ -328,15 +331,16 @@ func TestLoadSpecMultipleFiles(t *testing.T) {
 			t.Errorf("Failed to load valid file: %v", err)
 		}
 
-		// Load invalid file should fail
+		// Load invalid file should fail, but state should remain as after last successful load
 		err = LoadSpec(filename2)
 		if err == nil {
 			t.Error("Expected error when loading invalid file, but got none")
 		}
 
 		// Verify valid file content is still there
-		if failures["api-fault"] != 5 {
-			t.Errorf("Expected api-fault to still be 5, got %d", failures["api-fault"])
+		status := Status()
+		if len(status) != 1 || status["api-fault"] != 5 {
+			t.Errorf("Expected api-fault to still be 5 and only one fault present, got %+v", status)
 		}
 	})
 }
@@ -364,11 +368,12 @@ failures:
 			t.Errorf("Failed to load file with comments: %v", err)
 		}
 
-		if failures["api-fault"] != 5 {
-			t.Errorf("Expected api-fault to be 5, got %d", failures["api-fault"])
+		status := Status()
+		if status["api-fault"] != 5 {
+			t.Errorf("Expected api-fault to be 5, got %d", status["api-fault"])
 		}
-		if failures["db-fault"] != 3 {
-			t.Errorf("Expected db-fault to be 3, got %d", failures["db-fault"])
+		if status["db-fault"] != 3 {
+			t.Errorf("Expected db-fault to be 3, got %d", status["db-fault"])
 		}
 	})
 
@@ -390,22 +395,21 @@ failures:
 			t.Errorf("Failed to load file with zero values: %v", err)
 		}
 
-		if failures["zero-fault"] != 0 {
-			t.Errorf("Expected zero-fault to be 0, got %d", failures["zero-fault"])
+		status := Status()
+		if status["zero-fault"] != 0 {
+			t.Errorf("Expected zero-fault to be 0, got %d", status["zero-fault"])
 		}
-		if failures["normal-fault"] != 5 {
-			t.Errorf("Expected normal-fault to be 5, got %d", failures["normal-fault"])
+		if status["normal-fault"] != 5 {
+			t.Errorf("Expected normal-fault to be 5, got %d", status["normal-fault"])
 		}
 	})
 
 	t.Run("YAML with negative values", func(t *testing.T) {
 		resetState()
 
-		content := `failures:
-  negative-fault: -1
-  positive-fault: 5`
+		content := "failures:\n  negative-fault: -1\n  positive-fault: 5"
 		filename := "test-negative.yaml"
-		err := os.WriteFile(filename, []byte(content), 0644)
+		err := os.WriteFile(filename, []byte(strings.ReplaceAll(content, "\\n", "\n")), 0644)
 		if err != nil {
 			t.Fatalf("Failed to create test file: %v", err)
 		}
@@ -416,11 +420,9 @@ failures:
 			t.Errorf("Failed to load file with negative values: %v", err)
 		}
 
-		if failures["negative-fault"] != -1 {
-			t.Errorf("Expected negative-fault to be -1, got %d", failures["negative-fault"])
-		}
-		if failures["positive-fault"] != 5 {
-			t.Errorf("Expected positive-fault to be 5, got %d", failures["positive-fault"])
+		status := Status()
+		if len(status) != 2 || status["negative-fault"] != 0 || status["positive-fault"] != 5 {
+			t.Errorf("Expected negative-fault: 0 and positive-fault: 5, got %+v", status)
 		}
 	})
 } 

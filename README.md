@@ -260,54 +260,29 @@ status := faultinject.Status()
 
 ## Simplified Fault Injection
 
-To reduce the overhead of function calls, go-fi provides several convenience approaches:
+The basic `Inject()` function is powerful enough to handle all fault injection scenarios. Here are the most common patterns:
 
-### 1. Function-Based Injection (Recommended)
-
-Execute custom functions when faults occur:
+### 1. Basic Error Injection
 
 ```go
-// Execute a custom function when fault injection triggers
-if err := faultinject.InjectWithFn("db-insert", func() error {
-    return fmt.Errorf("database connection failed")
-}); err != nil {
-    return err
-}
-
-// Context-aware function execution
-if err := faultinject.InjectWithFnContext(ctx, "api-call", func() error {
-    return fmt.Errorf("API call failed")
-}); err != nil {
-    return err
-}
-```
-
-### 2. Error-Returning Functions
-
-Instead of checking the return value and creating an error manually:
-
-```go
-// Before: Manual check and error creation
+// Simple error injection
 if faultinject.Inject("db-insert") {
-    return fmt.Errorf("injected database failure")
+    return fmt.Errorf("database connection failed")
 }
 
-// After: Direct error return
-if err := faultinject.InjectWithError("db-insert", "database failure"); err != nil {
-    return err
+// With custom error messages
+if faultinject.Inject("api-call") {
+    return fmt.Errorf("API call failed: %s", "timeout")
 }
 ```
 
-**Available functions:**
+### 2. Context-Aware Injection
+
 ```go
-// Simple error with message
-faultinject.InjectWithError("key", "failure message")
-
-// Formatted error with arguments
-faultinject.InjectWithErrorf("key", "failed to %s: %v", "operation", err)
-
-// Context-aware error injection
-faultinject.InjectWithContextError(ctx, "key", "failure message")
+// Check context override first, then use Inject
+if ctx.Value("faultinject:db-insert") == true || faultinject.Inject("db-insert") {
+    return fmt.Errorf("database connection failed")
+}
 ```
 
 ### 3. HTTP Middleware
@@ -346,78 +321,98 @@ Use database-specific injectors for common database operations:
 
 ```go
 // PostgreSQL operations
-if err := faultinject.PostgresInjector.InjectConnectionFailure(); err != nil {
-    return err
+if faultinject.PostgresInjector.InjectConnectionFailure() != nil {
+    return fmt.Errorf("database connection failed")
 }
 
-if err := faultinject.PostgresInjector.InjectQueryFailure(); err != nil {
-    return err
+if faultinject.PostgresInjector.InjectQueryFailure() != nil {
+    return fmt.Errorf("database query failed")
 }
 
 // MySQL operations
-if err := faultinject.MySQLInjector.InjectTransactionFailure(); err != nil {
-    return err
+if faultinject.MySQLInjector.InjectTransactionFailure() != nil {
+    return fmt.Errorf("database transaction failed")
 }
 
 // Custom database type
 redisInjector := faultinject.NewDatabaseInjector("redis")
-if err := redisInjector.InjectTimeoutFailure(); err != nil {
-    return err
+if redisInjector.InjectTimeoutFailure() != nil {
+    return fmt.Errorf("redis timeout")
 }
 ```
 
-### 6. Context-Based Overrides
-
-Override fault injection behavior using context:
-
-```go
-// Override fault injection for specific requests
-ctx := context.WithValue(context.Background(), "faultinject:db-insert", true)
-
-// Use context-aware injection
-if err := faultinject.InjectWithContextError(ctx, "db-insert", "database failure"); err != nil {
-    return err
-}
-```
-
-### 7. One-Liner Patterns
-
-Combine multiple approaches for maximum simplicity:
-
-```go
-// Database operations
-func (s *UserService) CreateUser(user User) error {
-    return faultinject.PostgresInjector.WithFaultInjection("insert", func() error {
-        return s.db.Create(&user).Error
-    })
-}
-
-// API calls
-func (s *APIClient) CallAPI() error {
-    return faultinject.InjectWithError("api-call", "API call failed") || s.makeAPICall()
-}
-
-// HTTP handlers
-func userHandler(w http.ResponseWriter, r *http.Request) {
-    if err := faultinject.InjectWithError("user-handler", "handler failure"); err != nil {
-        http.Error(w, err.Error(), 500)
-        return
-    }
-    // Normal handler logic
-}
-```
-
-### 8. Build Tag Helpers
+### 6. Build Tag Helpers
 
 Use the NoOp functions for automatic switching between test and production:
 
 ```go
 // Same code works in both production and testing
 func (s *UserService) CreateUser(user User) error {
-    if err := faultinject.NoOpInjectWithError("user-create", "user creation failed"); err != nil {
-        return err
+    if faultinject.NoOpInject("user-create") {
+        return fmt.Errorf("user creation failed")
     }
     return s.db.Create(&user).Error
+}
+```
+
+### 7. Complex Scenarios with Basic Inject
+
+```go
+// Complex error handling
+if faultinject.Inject("payment-process") {
+    log.Println("Simulating payment processing failure...")
+    time.Sleep(100 * time.Millisecond)
+    return fmt.Errorf("payment gateway timeout")
+}
+
+// Database operations with custom logic
+if faultinject.Inject("db-query") {
+    log.Println("Simulating database query failure...")
+    return fmt.Errorf("database connection pool exhausted")
+}
+
+// External service calls
+if faultinject.Inject("email-service") {
+    log.Println("Simulating email service failure...")
+    return fmt.Errorf("SMTP server unreachable")
+}
+
+// Conditional logic
+if faultinject.Inject("api-call") {
+    if isRetryable {
+        return fmt.Errorf("retryable API failure")
+    } else {
+        return fmt.Errorf("permanent API failure")
+    }
+}
+```
+
+### 8. One-Liner Patterns
+
+```go
+// Database operations
+func (s *UserService) CreateUser(user User) error {
+    if faultinject.Inject("db-insert") {
+        return fmt.Errorf("database insert failed")
+    }
+    return s.db.Create(&user).Error
+}
+
+// API calls
+func (s *APIClient) CallAPI() error {
+    if faultinject.Inject("api-call") {
+        return fmt.Errorf("API call failed")
+    }
+    return s.makeAPICall()
+}
+
+// HTTP handlers
+func userHandler(w http.ResponseWriter, r *http.Request) {
+    if faultinject.Inject("user-handler") {
+        http.Error(w, "handler failure", 500)
+        return
+    }
+    // Normal handler logic
 }
 ```
 
@@ -425,14 +420,13 @@ func (s *UserService) CreateUser(user User) error {
 
 | Approach | Code Overhead | Flexibility | Use Case |
 |----------|---------------|-------------|----------|
-| `Inject()` | High | High | Custom logic |
-| `InjectWithError()` | Medium | High | Simple error returns |
+| `Inject()` | Low | High | All scenarios |
 | HTTP Middleware | Low | Medium | Web applications |
 | Decorators | Low | High | Function wrapping |
 | Database Helpers | Low | Medium | Database operations |
-| Context Overrides | Medium | High | Request-specific control |
+| Build Tag Helpers | Low | High | Production/Testing |
 
-Choose the approach that best fits your use case and coding style!
+The basic `Inject()` function is sufficient for most use cases and provides the most flexibility!
 
 ## Configuration
 

@@ -1,0 +1,10 @@
+failures:
+  user-api: 1
+  payment-api: 1
+  health-check: 1
+  data-api: 1
+  slow-api: 1
+  critical-api: 1
+
+precise-failures:
+  retry-api: 3 

@@ -22,7 +22,7 @@ func main() {
 	}
 	log.Println("Loaded faults:", faultinject.Status())
 
-	for i := 1; i <= 5; i++ {
+	for i := 1; i <= 10; i++ {
 		log.Printf("attempting to create an EC2 %d", i)
 		if err := createEC2(context.Background()); err != nil {
 			log.Println("error while attempting to create an EC2:", err)

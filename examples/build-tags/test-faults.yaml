@@ -1,0 +1,6 @@
+failures:
+  user-create: 2
+  database-connect: 1
+
+precise-failures:
+  api-call: 3 

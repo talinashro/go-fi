@@ -315,47 +315,7 @@ createUserWithFaults := faultinject.WithFaultInjection("user-create", createUser
 err := createUserWithFaults(user)
 ```
 
-### 5. Database-Specific Helpers
-
-Use database-specific injectors for common database operations:
-
-```go
-// PostgreSQL operations
-if faultinject.PostgresInjector.InjectConnectionFailure() != nil {
-    return fmt.Errorf("database connection failed")
-}
-
-if faultinject.PostgresInjector.InjectQueryFailure() != nil {
-    return fmt.Errorf("database query failed")
-}
-
-// MySQL operations
-if faultinject.MySQLInjector.InjectTransactionFailure() != nil {
-    return fmt.Errorf("database transaction failed")
-}
-
-// Custom database type
-redisInjector := faultinject.NewDatabaseInjector("redis")
-if redisInjector.InjectTimeoutFailure() != nil {
-    return fmt.Errorf("redis timeout")
-}
-```
-
-### 6. Build Tag Helpers
-
-Use the NoOp functions for automatic switching between test and production:
-
-```go
-// Same code works in both production and testing
-func (s *UserService) CreateUser(user User) error {
-    if faultinject.NoOpInject("user-create") {
-        return fmt.Errorf("user creation failed")
-    }
-    return s.db.Create(&user).Error
-}
-```
-
-### 7. Complex Scenarios with Basic Inject
+### 5. Complex Scenarios with Basic Inject
 
 ```go
 // Complex error handling
@@ -387,7 +347,7 @@ if faultinject.Inject("api-call") {
 }
 ```
 
-### 8. One-Liner Patterns
+### 6. One-Liner Patterns
 
 ```go
 // Database operations
@@ -423,8 +383,6 @@ func userHandler(w http.ResponseWriter, r *http.Request) {
 | `Inject()` | Low | High | All scenarios |
 | HTTP Middleware | Low | Medium | Web applications |
 | Decorators | Low | High | Function wrapping |
-| Database Helpers | Low | Medium | Database operations |
-| Build Tag Helpers | Low | High | Production/Testing |
 
 The basic `Inject()` function is sufficient for most use cases and provides the most flexibility!
 
@@ -849,231 +807,6 @@ go build -tags testing -o app-test
 # Run tests
 go test -tags testing ./...
 ```
-
-### Strategy 2: Environment-Based Configuration
-
-Use environment variables to control fault injection:
-
-```go
-// fault_injection.go
-package main
-
-import (
-    "os"
-    "github.com/talinashro/go-fi/faultinject"
-)
-
-var faultInjectionEnabled bool
-
-func init() {
-    faultInjectionEnabled = os.Getenv("ENABLE_FAULT_INJECTION") == "true"
-    if faultInjectionEnabled {
-        faultinject.LoadSpec("faults.yaml")
-    }
-}
-
-func injectFault(key string) bool {
-    if !faultInjectionEnabled {
-        return false
-    }
-    return faultinject.Inject(key)
-}
-```
-
-**Usage in application:**
-```go
-func (s *UserService) CreateUser(email string) (*User, error) {
-    if injectFault("db-insert") {
-        return nil, fmt.Errorf("injected database failure")
-    }
-    
-    // Actual business logic
-    user := &User{Email: email}
-    if err := s.db.Create(user).Error; err != nil {
-        return nil, err
-    }
-    
-    return user, nil
-}
-```
-
-**Run with fault injection:**
-```bash
-ENABLE_FAULT_INJECTION=true go run main.go
-```
-
-### Strategy 3: Separate Test Binary
-
-Create a separate test binary that includes fault injection:
-
-```go
-// cmd/test/main.go
-package main
-
-import (
-    "github.com/talinashro/go-fi/faultinject"
-    "your-app/internal/services"
-)
-
-func main() {
-    // Load fault injection configuration
-    faultinject.LoadSpec("test-faults.yaml")
-    
-    // Start control server
-    faultinject.StartControlServer(":8081", nil)
-    
-    // Run your application with fault injection
-    app := services.NewApp()
-    app.Run()
-}
-```
-
-**Production binary remains clean:**
-```go
-// cmd/prod/main.go
-package main
-
-import "your-app/internal/services"
-
-func main() {
-    // Clean production binary - no fault injection
-    app := services.NewApp()
-    app.Run()
-}
-```
-
-### Strategy 4: Interface-Based Approach
-
-Use interfaces to abstract fault injection:
-
-```go
-// fault_injector.go
-package main
-
-type FaultInjector interface {
-    Inject(key string) bool
-}
-
-type NoOpFaultInjector struct{}
-
-func (n NoOpFaultInjector) Inject(key string) bool {
-    return false
-}
-
-type RealFaultInjector struct{}
-
-func (r RealFaultInjector) Inject(key string) bool {
-    return faultinject.Inject(key)
-}
-
-// Service with dependency injection
-type UserService struct {
-    db            *gorm.DB
-    faultInjector FaultInjector
-}
-
-func NewUserService(db *gorm.DB, faultInjector FaultInjector) *UserService {
-    return &UserService{
-        db:            db,
-        faultInjector: faultInjector,
-    }
-}
-
-func (s *UserService) CreateUser(email string) (*User, error) {
-    if s.faultInjector.Inject("db-insert") {
-        return nil, fmt.Errorf("injected database failure")
-    }
-    
-    // Actual business logic
-    user := &User{Email: email}
-    if err := s.db.Create(user).Error; err != nil {
-        return nil, err
-    }
-    
-    return user, nil
-}
-```
-
-**Production usage:**
-```go
-func main() {
-    db := initDatabase()
-    service := NewUserService(db, NoOpFaultInjector{})
-    // ... rest of app
-}
-```
-
-**Test usage:**
-```go
-func TestMain(m *testing.M) {
-    faultinject.LoadSpec("test-faults.yaml")
-    os.Exit(m.Run())
-}
-
-func TestUserService(t *testing.T) {
-    db := initTestDatabase()
-    service := NewUserService(db, RealFaultInjector{})
-    // ... test logic
-}
-```
-
-### Strategy 5: Compile-Time Constants
-
-Use compile-time constants to completely eliminate fault injection code:
-
-```go
-// build.go
-package main
-
-//go:generate go run build.go
-
-const (
-    ENABLE_FAULT_INJECTION = false // Set to true for test builds
-)
-
-// fault_injection.go
-package main
-
-import "github.com/talinashro/go-fi/faultinject"
-
-func injectFault(key string) bool {
-    if !ENABLE_FAULT_INJECTION {
-        return false
-    }
-    return faultinject.Inject(key)
-}
-```
-
-**Build script:**
-```bash
-#!/bin/bash
-# build-test.sh
-sed -i 's/ENABLE_FAULT_INJECTION = false/ENABLE_FAULT_INJECTION = true/' build.go
-go build -o app-test
-sed -i 's/ENABLE_FAULT_INJECTION = true/ENABLE_FAULT_INJECTION = false/' build.go
-```
-
-## Recommended Approach
-
-For most projects, we recommend **Strategy 1 (Build Tags)** because:
-
-- **Zero runtime overhead** in production
-- **Clean separation** between test and production code
-- **Easy to use** with existing Go tooling
-- **No conditional logic** in production binaries
-- **Works well** with CI/CD pipelines
-
-Example CI/CD pipeline:
-```yaml
-# .github/workflows/test.yml
-- name: Run tests with fault injection
-  run: go test -tags testing ./...
-
-- name: Build production binary
-  run: go build -o app
-```
-
-This ensures your production binary is completely clean while maintaining full fault injection capabilities during testing and development.
 
 ## Contributing
 

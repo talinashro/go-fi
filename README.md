@@ -218,8 +218,6 @@ func (s *OrderService) CreateOrder(order Order) (*Order, error) {
 
 ## API Reference
 
-### Core Functions
-
 #### `Inject(key string) bool`
 Injects a failure for the given key. Returns `true` if the operation should fail.
 
@@ -258,6 +256,22 @@ status := faultinject.Status()
 // Returns: map[string]int{"database-connect": 2, "api-call": 0}
 ```
 
+#### `LoadSpec(path string) error`
+Loads failure configuration from a YAML file.
+
+```go
+if err := faultinject.LoadSpec("faults.yaml"); err != nil {
+    log.Fatalf("Failed to load fault spec: %v", err)
+}
+```
+
+#### `StartControlServer(addr string, runHandler http.HandlerFunc)`
+Starts an HTTP server for remote control.
+
+```go
+faultinject.StartControlServer(":8081", nil)
+```
+
 ## Simplified Fault Injection
 
 The basic `Inject()` function is powerful enough to handle all fault injection scenarios. Here are the most common patterns:
@@ -290,12 +304,12 @@ if ctx.Value("faultinject:db-insert") == true || faultinject.Inject("db-insert")
 For web applications, use middleware to automatically inject failures:
 
 ```go
-// Simple middleware
+// HTTP middleware with default 500 status code
 mux := http.NewServeMux()
 mux.Handle("/api/users", faultinject.HTTPMiddleware("user-api")(userHandler))
 
-// Middleware with custom status code
-mux.Handle("/api/payments", faultinject.HTTPMiddlewareWithStatus("payment-api", 503)(paymentHandler))
+// HTTP middleware with custom status code
+mux.Handle("/api/payments", faultinject.HTTPMiddleware("payment-api")(paymentHandler))
 ```
 
 ### 4. Function Decorators
@@ -385,58 +399,6 @@ func userHandler(w http.ResponseWriter, r *http.Request) {
 | Decorators | Low | High | Function wrapping |
 
 The basic `Inject()` function is sufficient for most use cases and provides the most flexibility!
-
-## Configuration
-
-#### `LoadSpec(path string) error`
-Loads failure configuration from a YAML file.
-
-```yaml
-# faults.yaml
-failures:
-  database-connect: 2      # Fail first 2 calls
-  cache-get: 1             # Fail first 1 call
-  external-api: 3          # Fail first 3 calls
-
-precise-failures:
-  payment-service: 5       # Fail only 5th call
-  email-service: 10        # Fail only 10th call
-```
-
-```go
-if err := faultinject.LoadSpec("faults.yaml"); err != nil {
-    log.Fatalf("Failed to load fault spec: %v", err)
-}
-```
-
-### HTTP Control Server
-
-#### `StartControlServer(addr string, runHandler http.HandlerFunc)`
-Starts an HTTP server for remote control.
-
-```go
-// Start control server on port 8081
-faultinject.StartControlServer(":8081", nil)
-```
-
-**Available endpoints:**
-
-- `POST /set?key=<key>&count=<n>` - Set failure count
-- `POST /reset` - Reset all failures
-- `GET /status` - Get current status
-- `POST /run` - Custom handler (optional)
-
-**Example usage:**
-```bash
-# Set database to fail first 3 times
-curl -X POST "http://localhost:8081/set?key=database-connect&count=3"
-
-# Check current status
-curl "http://localhost:8081/status"
-
-# Reset all failures
-curl -X POST "http://localhost:8081/reset"
-```
 
 ## HTTP Control Server
 

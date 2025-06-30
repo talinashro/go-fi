@@ -1,0 +1,10 @@
+failures:
+  demo-error: 1
+  user-api: 2
+  payment-api: 1
+  user-create: 1
+  db-insert: 1
+
+precise-failures:
+  database-postgres-connect: 3
+  database-postgres-query: 2 

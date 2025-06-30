@@ -1,0 +1,10 @@
+failures:
+  db-insert: 1
+  api-call: 1
+  payment-process: 1
+  db-query: 1
+  email-service: 1
+  user-create: 1
+
+precise-failures:
+  external-api: 3 

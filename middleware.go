@@ -12,10 +12,17 @@ import (
 // HTTPMiddleware creates middleware that injects failures for HTTP requests
 // Returns 500 status code by default when fault injection triggers
 func HTTPMiddleware(key string) func(http.Handler) http.Handler {
+	return HTTPMiddlewareWithResponse(key, func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "Injected failure", http.StatusInternalServerError)
+	})
+}
+
+// HTTPMiddlewareWithResponse creates middleware with custom response handling
+func HTTPMiddlewareWithResponse(key string, responseFn func(http.ResponseWriter, *http.Request)) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if Inject(key) {
-				http.Error(w, "Injected failure", http.StatusInternalServerError)
+				responseFn(w, r)
 				return
 			}
 			next.ServeHTTP(w, r)

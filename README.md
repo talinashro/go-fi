@@ -373,8 +373,24 @@ For web applications, use middleware to automatically inject failures:
 mux := http.NewServeMux()
 mux.Handle("/api/users", faultinject.HTTPMiddleware("user-api")(userHandler))
 
-// HTTP middleware with custom status code
-mux.Handle("/api/payments", faultinject.HTTPMiddleware("payment-api")(paymentHandler))
+// HTTP middleware with custom response
+mux.Handle("/api/payments", faultinject.HTTPMiddlewareWithResponse("payment-api", func(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(503)
+    w.Write([]byte(`{"error": "payment service unavailable"}`))
+})(paymentHandler))
+
+// HTTP middleware with different status codes
+mux.Handle("/api/health", faultinject.HTTPMiddlewareWithResponse("health-check", func(w http.ResponseWriter, r *http.Request) {
+    http.Error(w, "health check failed", 503)
+})(healthHandler))
+
+// HTTP middleware with custom logic
+mux.Handle("/api/data", faultinject.HTTPMiddlewareWithResponse("data-api", func(w http.ResponseWriter, r *http.Request) {
+    log.Println("Simulating data API failure...")
+    w.Header().Set("Retry-After", "30")
+    http.Error(w, "service temporarily unavailable", 503)
+})(dataHandler))
 ```
 
 ### 4. Function Decorators

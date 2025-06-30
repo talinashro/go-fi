@@ -272,6 +272,71 @@ Starts an HTTP server for remote control.
 faultinject.StartControlServer(":8081", nil)
 ```
 
+#### `SetAllowedEnvironments(envs []string)`
+Configures which environments allow fault injection.
+
+```go
+faultinject.SetAllowedEnvironments([]string{"development", "staging", "testing"})
+```
+
+#### `SetProductionEnvironments(envs []string)`
+Configures which environments are considered production.
+
+```go
+faultinject.SetProductionEnvironments([]string{"production", "prod"})
+```
+
+## Environment-Based Control
+
+go-fi automatically disables fault injection in production environments to prevent accidental failures in live systems.
+
+### Default Behavior
+
+- **Allowed environments**: `development`, `staging`, `testing`
+- **Production environments**: `production`, `prod`
+- **Default**: If environment is not explicitly allowed, fault injection is disabled
+
+### Environment Detection
+
+The library checks for environment variables in this order:
+1. `ENVIRONMENT`
+2. `ENV`
+3. `GO_ENV`
+
+### Configuration
+
+```go
+// Customize allowed environments
+faultinject.SetAllowedEnvironments([]string{"dev", "test", "qa"})
+
+// Customize production environments
+faultinject.SetProductionEnvironments([]string{"prod", "live", "production"})
+```
+
+### Examples
+
+```bash
+# Development - fault injection enabled
+ENVIRONMENT=development go run main.go
+
+# Staging - fault injection enabled
+ENV=staging go run main.go
+
+# Production - fault injection disabled
+GO_ENV=production go run main.go
+
+# Unknown environment - fault injection disabled (defaults to production)
+ENVIRONMENT=unknown go run main.go
+```
+
+### Production Safety
+
+In production environments:
+- `Inject()` always returns `false`
+- `SetFailures()` and `SetNthFailure()` are no-ops
+- All fault injection calls are safely ignored
+- No runtime overhead from fault injection logic
+
 ## Simplified Fault Injection
 
 The basic `Inject()` function is powerful enough to handle all fault injection scenarios. Here are the most common patterns:
@@ -411,7 +476,7 @@ The control server enables:
 - **Runtime Configuration Changes**: Modify fault injection settings via HTTP requests
 - **Chaos Engineering Experiments**: Dynamically inject failures during live testing
 - **Load Testing with Dynamic Failures**: Adjust failure rates during load tests
-- **Production Monitoring**: Monitor and control fault injection in production environments
+- **Development and Staging Control**: Monitor and control fault injection in non-production environments
 
 ### Available Endpoints
 
@@ -513,26 +578,13 @@ func TestIntegrationWithFailures(t *testing.T) {
 }
 ```
 
-#### 4. Production Monitoring
-
-```go
-func main() {
-    // Start control server for monitoring
-    faultinject.StartControlServer(":8081", nil)
-    
-    // Your application logic
-    app := NewApp()
-    app.Run()
-}
-```
-
 ### Benefits
 
 - **No Restart Required**: Change fault injection settings without stopping your application
 - **Remote Management**: Control fault injection from anywhere via HTTP
 - **Real-time Monitoring**: Check current status and remaining failures
 - **Automation Friendly**: Easy to integrate with CI/CD pipelines and testing scripts
-- **Production Safe**: Can be used in production for chaos engineering experiments
+- **Environment Safe**: Automatically disabled in production environments
 
 The control server essentially gives you a **remote control panel** for your fault injection system, making it much more flexible and powerful for testing and chaos engineering scenarios.
 
@@ -772,11 +824,7 @@ go test -tags testing ./...
 
 ## Contributing
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details on how to submit pull requests, report issues, and contribute to the project.
 
 ## License
 

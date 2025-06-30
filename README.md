@@ -851,3 +851,35 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 - Inspired by Netflix's Chaos Monkey
 - Built for the Go community's testing needs
 - Thanks to all contributors and users
+
+## Testing
+
+Run the test suite:
+
+```bash
+# Run all tests (excluding examples)
+go test -v .
+
+# Run tests with race detector
+go test -race -v .
+
+# Run tests with coverage
+go test -coverprofile=coverage.out -covermode=atomic .
+go tool cover -html=coverage.out -o coverage.html
+
+# Using Makefile (recommended)
+make test
+make test-race
+make test-coverage
+make check  # Run vet, staticcheck, and tests
+```
+
+**Note:** The examples are not included in the test suite since they are standalone applications, not test files. To build the examples separately:
+
+```bash
+make examples
+```
+
+## Development
+
+// ... existing code ...

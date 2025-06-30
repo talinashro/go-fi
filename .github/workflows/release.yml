@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  tag-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+      - name: Create v1.0.0 tag
+        run: |
+          # Check if v1.0.0 tag already exists
+          if ! git tag -l | grep -q "^v1\.0\.0$"; then
+            git tag v1.0.0
+            git push origin v1.0.0
+            echo "Created and pushed v1.0.0 tag"
+          else
+            echo "v1.0.0 tag already exists"
+          fi
+
+      - name: Update latest tag
+        run: |
+          # Delete existing latest tag if it exists
+          git tag -d latest 2>/dev/null || true
+          git push origin :refs/tags/latest 2>/dev/null || true
+          
+          # Create new latest tag pointing to current release
+          git tag latest
+          git push origin latest
+          echo "Updated latest tag to point to current release"
+
+      - name: Verify tags
+        run: |
+          echo "Current tags:"
+          git tag -l | sort -V 

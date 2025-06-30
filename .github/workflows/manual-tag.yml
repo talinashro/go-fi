@@ -1,0 +1,59 @@
+name: Manual Tag Creation
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to tag (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+      create_latest:
+        description: 'Also create/update latest tag'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  create-tags:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+      - name: Create version tag
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          
+          # Check if tag already exists
+          if git tag -l | grep -q "^${VERSION}$"; then
+            echo "Tag ${VERSION} already exists"
+          else
+            git tag ${VERSION}
+            git push origin ${VERSION}
+            echo "Created and pushed ${VERSION} tag"
+          fi
+
+      - name: Update latest tag
+        if: ${{ github.event.inputs.create_latest }}
+        run: |
+          # Delete existing latest tag if it exists
+          git tag -d latest 2>/dev/null || true
+          git push origin :refs/tags/latest 2>/dev/null || true
+          
+          # Create new latest tag pointing to current commit
+          git tag latest
+          git push origin latest
+          echo "Updated latest tag to point to current commit"
+
+      - name: Verify tags
+        run: |
+          echo "Current tags:"
+          git tag -l | sort -V 

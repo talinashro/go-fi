@@ -9,6 +9,12 @@ import (
 	"testing"
 )
 
+type ctxKey string
+const (
+	testKey ctxKey = "test-key"
+	originalKey ctxKey = "original-key"
+)
+
 func TestHTTPMiddleware(t *testing.T) {
 	// Reset state before each test
 	resetState()
@@ -432,9 +438,8 @@ func TestMiddlewareRequestContext(t *testing.T) {
 
 		// Create test handler that checks context
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Add a value to context
-			ctx := context.WithValue(r.Context(), "test-key", "test-value")
-			r = r.WithContext(ctx)
+			// Add a value to context (not used in this test, but demonstrates context access)
+			_ = context.WithValue(r.Context(), testKey, "test-value")
 			
 			w.WriteHeader(200)
 			w.Write([]byte("success"))
@@ -446,7 +451,7 @@ func TestMiddlewareRequestContext(t *testing.T) {
 
 		// Create test request with context
 		req := httptest.NewRequest("GET", "/test", nil)
-		ctx := context.WithValue(context.Background(), "original-key", "original-value")
+		ctx := context.WithValue(context.Background(), originalKey, "original-value")
 		req = req.WithContext(ctx)
 		w := httptest.NewRecorder()
 
